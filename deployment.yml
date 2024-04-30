@@ -1,0 +1,86 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: ssodemo
+  namespace: demo
+  labels:
+    app: ssodemo
+    app.kubernetes.io/component: ssodemo
+    app.kubernetes.io/instance: ssodemo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      deployment: ssodemo
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        deployment: ssodemo
+      annotations:
+        openshift.io/generated-by: OpenShiftNewApp
+    spec:
+      initContainers:
+      - name: pem-to-truststore
+        image: registry.access.redhat.com/ubi9/openjdk-17-runtime:1.18-3
+        env:
+          - name: truststore_jks
+            value: /var/run/secrets/java.io/keystores/truststore.jks
+          - name: password
+            value: changeit    
+        command: ['/bin/bash']
+        args: ['-c', "keytool -import -noprompt -keystore $truststore_jks -file /mnt/idp_certificate/tls.crt -storepass changeit -alias sso_idp"]
+        volumeMounts:
+          - name: keystore-volume
+            mountPath: /var/run/secrets/java.io/keystores  
+          - name: keycloak-tls-certificate
+            mountPath: /mnt/idp_certificate
+      volumes:
+        - name: keystore-volume
+          emptyDir: {} 
+        - name: keycloak-tls-certificate
+          secret:
+            secretName: keycloak-tls-secret
+            defaultMode: 420
+            optional: false
+        - name: app-volume
+          configMap:
+            name: app-conf
+        - name: saml-volume
+          secret:
+            secretName: saml-secret
+            defaultMode: 420
+            optional: false
+      containers:
+        - name: ssodemo
+          image: 'quay.io/dacheung1/saml2-sso-springboot-keycloak:0.0.1-SNAPSHOT'
+          env:
+          - name: JAVA_OPTIONS
+            value: -Djavax.net.ssl.trustStore=/var/run/secrets/java.io/keystores/truststore.jks -Djavax.net.ssl.trustStorePassword=changeit -Dsaml.keystore.path=file:/appconf/saml/keystore.jks -Dspring.config.location=file:/appconf/application.yml
+          volumeMounts:
+            - name: keystore-volume
+              mountPath: /var/run/secrets/java.io/keystores
+            - name: app-volume
+              mountPath: /appconf
+            - name: saml-volume
+              mountPath: /appconf/saml
+          ports:
+            - containerPort: 8081
+              protocol: TCP
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          imagePullPolicy: IfNotPresent
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      securityContext: {}
+      schedulerName: default-scheduler
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600
+

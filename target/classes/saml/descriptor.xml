@@ -1,0 +1,25 @@
+<md:EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" entityID="https://keycloak.apps.sno.cheers.local/realms/external">
+<md:IDPSSODescriptor WantAuthnRequestsSigned="true" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+<md:KeyDescriptor use="signing">
+<ds:KeyInfo>
+<ds:KeyName>W87geqOQJasyEdKcvQovLDVz2KOLBqdQIjckxe_zkd8</ds:KeyName>
+<ds:X509Data>
+<ds:X509Certificate>MIICnzCCAYcCBgGPETQWrTANBgkqhkiG9w0BAQsFADATMREwDwYDVQQDDAhleHRlcm5hbDAeFw0yNDA0MjQxNzQxMTdaFw0zNDA0MjQxNzQyNTdaMBMxETAPBgNVBAMMCGV4dGVybmFsMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA86bdBQIGTc+yCMfR5cEpPkX1973s61ndqbxrbmMpwT6SEPsRXhbwK4bgJXrC/guRThfm0j8O8chs1a6/rY3Egha0PB5FHNU51JzAnZ9o2Eo14SKRDnxCskGwA+Pkb9LSI+WpKajklKnkGNqkdyiKmnMWCRrFGTIjEPxnKBVr5xO1PEpux6oygtC4EoT+LtvDxawtFvJJsckOJeYtGeR8PSbS/BfXAmn74Xei9Ci4iVyX/zWK01aaxROYtQ/2wY8U1yp3y8eL2LNPBPOrnWtd6TAXBNpia8f8tPCKwoL5cj3C8G2S/lhPNzTE//ISsexD4hem6ca7+zjNJkR++oLtzwIDAQABMA0GCSqGSIb3DQEBCwUAA4IBAQCdWyxrbmjDeq4j4etElVyYbr06U3M+plp8JOJVOqsxt1rpdby+qN95q8Raw9Zfj6bDxD8yWFkcVeoo6KmFkfAWLvP+GVQaqgDoOA/u+DNfWfshYFFjrStwSCglMxSa9X8Sb22iDW/Pw6OjYvkuvorW0sRqGriTY6+0rIWmHHG1uYiQH1mu7nJWnPAeWRiqAfBwqo+ihF9ZZ5OGq3UYhVb40bGwJCsGiY31hozo/wVyExwu7eVBcaOLuzgv5nTS3bNbvWr5XAdqmtWWojUDHnO5DtclGL7KBmrBqHGuQYkdLFiMP4egbVj1d2xrwuesRLbVdt0Uiki3HY1tQjUuNAA+</ds:X509Certificate>
+</ds:X509Data>
+</ds:KeyInfo>
+</md:KeyDescriptor>
+<md:ArtifactResolutionService Binding="urn:oasis:names:tc:SAML:2.0:bindings:SOAP" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml/resolve" index="0"/>
+<md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+<md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+<md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Artifact" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+<md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:SOAP" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+<md:NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:persistent</md:NameIDFormat>
+<md:NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:transient</md:NameIDFormat>
+<md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified</md:NameIDFormat>
+<md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</md:NameIDFormat>
+<md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+<md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+<md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:SOAP" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+<md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Artifact" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+</md:IDPSSODescriptor>
+</md:EntityDescriptor>
