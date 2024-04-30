@@ -8,7 +8,7 @@
 		<version>2.7.3</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>com.henry</groupId>
+	<groupId>com.demo</groupId>
 	<artifactId>saml2-sso-springboot-keycloak</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>saml2-sso-springboot-keycloak</name>

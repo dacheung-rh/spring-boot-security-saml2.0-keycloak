@@ -1,8 +1,0 @@
-com/henry/authentication/CurrentUserHandlerMethodArgumentResolver.class
-com/henry/config/SecurityConfig.class
-com/henry/authentication/SAMLUserDetailsServiceImpl.class
-com/henry/config/SamlSecurityConfig.class
-com/henry/controller/IndexController.class
-com/henry/authentication/MvcConfig.class
-com/henry/Same2SsoSpringbokKeycloakApplication.class
-com/henry/stereotypes/CurrentUser.class
