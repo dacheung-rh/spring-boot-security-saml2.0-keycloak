@@ -1,0 +1,262 @@
+
+##############################################
+Issues:
+1) issue: spring PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target
+
+solution:
+
+IDP_HOST=keycloak.apps.sno.cheers.local
+IDP_PORT=443
+CERTIFICATE_FILE=keycloak.pem
+KEYSTORE_FILE=keystore.jks
+KEYSTORE_PASSWORD=store123
+
+openssl s_client -host $IDP_HOST -port $IDP_PORT -showcerts </dev/null | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > $CERTIFICATE_FILE
+  
+sudo keytool -import -alias keycloak -keystore $JAVA_HOME/lib/security/cacerts -file $CERTIFICATE_FILE
+
+passcode: changeit
+
+sudo keytool -delete -alias keycloak -keystore $JAVA_HOME/lib/security/cacerts -storepass changeit
+
+keytool -list -v -keystore $JAVA_HOME/lib/security/cacerts | grep -A 1 "Owner"
+
+###############################################
+2) javax.net.ssl.SSLException: SSLSession was invalid: Likely implicit handshake failure
+e.g.
+TransportContext.java:370|Fatal (CERTIFICATE_UNKNOWN): Peer SSL/TLS certificate 'C=US, O=Test Keycloak., CN=keycloak.apps.sno.cheers.local' issued by 'C=US, O=Test Keycloak., CN=keycloak.apps.sno.cheers.local' is not trusted, add the certificate or it's CA to your trust store and optionally update tlsKey in extended metadata with the certificate's alias
+
+Follow certificates (in PEM format) presented by the peer. Content between being/end certificate (including) can be stored in a file and imported using keytool, e.g. 'keytool -importcert -file cert.cer -alias certAlias -keystore keystore.jks'). Make sure the presented certificates are issued by your trusted CA before adding them to the keystore.
+
+Solution:
+delete the following setting on config class
+
+    // public TLSProtocolConfigurer tlsProtocolConfigurer() {
+    //     return new TLSProtocolConfigurer();
+    // }
+
+################################################################
+3) ERROR [org.keycloak.protocol.saml.SamlService] (executor-thread-19) request validation failed: org.keycloak.common.VerificationException: Error validating signature
+
+
+
+
+###########################################################################################
+
+IDP_HOST=keycloak.apps.sno.cheers.local
+IDP_PORT=443
+CERTIFICATE_FILE=keycloak.pem
+KEYSTORE_FILE=keystore.jks
+KEYSTORE_PASSWORD=store123
+
+openssl s_client -host $IDP_HOST -port $IDP_PORT -showcerts </dev/null | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > $CERTIFICATE_FILE
+
+keytool -delete -alias keycloak -keystore $KEYSTORE_FILE -storepass $KEYSTORE_PASSWORD
+
+keytool -import -alias keycloak -file $CERTIFICATE_FILE -keystore $KEYSTORE_FILE -storepass $KEYSTORE_PASSWORD -noprompt
+
+keytool -list -v -keystore keystore.jks | grep -A 1 "Owner"
+
+
+############################################################################################
+# SPENGO setup on server and windows client
+
+setspn -S HTTP/<keycloak_URI> <aduser>
+
+setspn -S HTTP/keycloak.apps.sno.cheers.local azureuser
+
+ktpass -out azureuser.keytab -princ HTTP/keycloak.apps.sno.cheers.local@POC-EMSD -mapUser azureuser -mapOp set -pass Redh@t123 -crypto AES256-SHA1 -ptype KRB5_NT_PRINCIPAL
+
+ktutil -k azureuser.keytab list
+
+
+
+
+############################################################################################
+# build and deploy sso demo app
+
+mvn clean package -Popenshift -Ddekorate.deploy=true
+
+oc new-build --binary=true --image-stream=java:openjdk-17-ubi8 --name ssodemo
+
+oc start-build ssodemo --from-dir=./target/saml2-sso-springboot-keycloak-0.0.1-SNAPSHOT.jar --follow
+
+oc start-build ssodemo --from-file=./target/saml2-sso-springboot-keycloak-0.0.1-SNAPSHOT.jar --follow
+
+oc new-app ssodemo
+
+##################################################################################################
+
+# First stage: build the application
+FROM maven:3.8.3-jdk-11 AS build
+COPY . /app
+WORKDIR /app
+RUN mvn package -DskipTests
+
+# Second stage: create a slim image
+FROM registry.access.redhat.com/ubi9/openjdk-17-runtime:1.18-3
+COPY --from=build /app/target/saml2-sso-springboot-keycloak-*.jar /app.jar
+ENTRYPOINT ["java", "-jar", "/app.jar"]
+
+podman build -t namexxx .
+
+
+#############################################################################################
+
+oc project demo
+oc create secret tls keycloak-tls-secret --cert certificate.pem --key key.pem -oyaml --dry-run | oc apply -f -
+
+
+cat <<\EOF | oc apply -f -
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: ssodemo
+  namespace: demo
+  labels:
+    app: ssodemo
+    app.kubernetes.io/component: ssodemo
+    app.kubernetes.io/instance: ssodemo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      deployment: ssodemo
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        deployment: ssodemo
+      annotations:
+        openshift.io/generated-by: OpenShiftNewApp
+    spec:
+      initContainers:
+      - name: pem-to-truststore
+        image: registry.access.redhat.com/ubi9/openjdk-17-runtime:1.18-3
+        env:
+          - name: truststore_jks
+            value: /var/run/secrets/java.io/keystores/truststore.jks
+          - name: password
+            value: changeit    
+        command: ['/bin/bash']
+        args: ['-c', "keytool -import -noprompt -keystore $truststore_jks -file /mnt/idp_certificate/tls.crt -storepass changeit -alias sso_idp"]
+        volumeMounts:
+          - name: keystore-volume
+            mountPath: /var/run/secrets/java.io/keystores  
+          - name: keycloak-tls-certificate
+            mountPath: /mnt/idp_certificate
+      volumes:
+        - name: keystore-volume
+          emptyDir: {} 
+        - name: keycloak-tls-certificate
+          secret:
+            secretName: keycloak-tls-secret
+            defaultMode: 420
+            optional: false
+      containers:
+        - name: ssodemo
+          image: 'image-registry.openshift-image-registry.svc:5000/demo/ssodemo@sha256:1413d2aa1b285017352069910879e4fda101c5538feed956ca9971bca7be3c61'
+          env:
+          - name: JAVA_OPTIONS
+            value: -Djavax.net.ssl.trustStore=/var/run/secrets/java.io/keystores/truststore.jks -Djavax.net.ssl.trustStorePassword=changeit
+          volumeMounts:
+          - mountPath: /var/run/secrets/java.io/keystores
+            name: keystore-volume
+          ports:
+            - containerPort: 8081
+              protocol: TCP
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          imagePullPolicy: IfNotPresent
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      securityContext: {}
+      schedulerName: default-scheduler
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600
+EOF
+
+
+-Djavax.net.ssl.trustStore=/var/run/secrets/java.io/keystores/truststore.jks -Djavax.net.ssl.trustStorePassword=changeit -Dspring.config.location=classpath:/appconf
+
+
+--spring.config.location=classpath:/home/davy/workspace2/spring-boot-security-saml2.0-keycloak/target/classes
+
+podman pull quay.io/dacheung1/saml2-sso-springboot-keycloak
+
+
+sudo mvn spring-boot:build-image
+
+
+FROM bellsoft/liberica-runtime-container:jre-17-stream-musl
+COPY target/spring-boot-app-0.0.1-SNAPSHOT.jar springbootapp.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "/springbootapp.jar"]
+
+
+###############################################################################3
+
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: app-conf
+data:
+  application.yml: |+
+    server:
+      port: 8081
+      servlet:
+        context-path: /
+    spring:
+      main:
+        allow-circular-references: true
+
+    keycloak:
+      client: spring-boot-keycloak
+
+    saml:
+      keystore:
+        path: classpath:/saml/keystore.jks
+        password: store123
+        alias: spring-boot-keycloak
+      url:
+        descriptor: https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml/descriptor
+
+  descriptor.xml: |-
+    <md:EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" entityID="https://keycloak.apps.sno.cheers.local/realms/external">
+    <md:IDPSSODescriptor WantAuthnRequestsSigned="true" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <md:KeyDescriptor use="signing">
+    <ds:KeyInfo>
+    <ds:KeyName>W87geqOQJasyEdKcvQovLDVz2KOLBqdQIjckxe_zkd8</ds:KeyName>
+    <ds:X509Data>
+    <ds:X509Certificate>MIICnzCCAYcCBgGPETQWrTANBgkqhkiG9w0BAQsFADATMREwDwYDVQQDDAhleHRlcm5hbDAeFw0yNDA0MjQxNzQxMTdaFw0zNDA0MjQxNzQyNTdaMBMxETAPBgNVBAMMCGV4dGVybmFsMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA86bdBQIGTc+yCMfR5cEpPkX1973s61ndqbxrbmMpwT6SEPsRXhbwK4bgJXrC/guRThfm0j8O8chs1a6/rY3Egha0PB5FHNU51JzAnZ9o2Eo14SKRDnxCskGwA+Pkb9LSI+WpKajklKnkGNqkdyiKmnMWCRrFGTIjEPxnKBVr5xO1PEpux6oygtC4EoT+LtvDxawtFvJJsckOJeYtGeR8PSbS/BfXAmn74Xei9Ci4iVyX/zWK01aaxROYtQ/2wY8U1yp3y8eL2LNPBPOrnWtd6TAXBNpia8f8tPCKwoL5cj3C8G2S/lhPNzTE//ISsexD4hem6ca7+zjNJkR++oLtzwIDAQABMA0GCSqGSIb3DQEBCwUAA4IBAQCdWyxrbmjDeq4j4etElVyYbr06U3M+plp8JOJVOqsxt1rpdby+qN95q8Raw9Zfj6bDxD8yWFkcVeoo6KmFkfAWLvP+GVQaqgDoOA/u+DNfWfshYFFjrStwSCglMxSa9X8Sb22iDW/Pw6OjYvkuvorW0sRqGriTY6+0rIWmHHG1uYiQH1mu7nJWnPAeWRiqAfBwqo+ihF9ZZ5OGq3UYhVb40bGwJCsGiY31hozo/wVyExwu7eVBcaOLuzgv5nTS3bNbvWr5XAdqmtWWojUDHnO5DtclGL7KBmrBqHGuQYkdLFiMP4egbVj1d2xrwuesRLbVdt0Uiki3HY1tQjUuNAA+</ds:X509Certificate>
+    </ds:X509Data>
+    </ds:KeyInfo>
+    </md:KeyDescriptor>
+    <md:ArtifactResolutionService Binding="urn:oasis:names:tc:SAML:2.0:bindings:SOAP" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml/resolve" index="0"/>
+    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Artifact" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:SOAP" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+    <md:NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:persistent</md:NameIDFormat>
+    <md:NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:transient</md:NameIDFormat>
+    <md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified</md:NameIDFormat>
+    <md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</md:NameIDFormat>
+    <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+    <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+    <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:SOAP" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+    <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Artifact" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+    </md:IDPSSODescriptor>
+    </md:EntityDescriptor>
+  keystore.jks: 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
+
+
+
+
+

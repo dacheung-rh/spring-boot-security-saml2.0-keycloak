@@ -1,0 +1,497 @@
+https://access.redhat.com/documentation/en-us/red_hat_build_of_keycloak/22.0/html-single/operator_guide/index#advanced-configuration-advanced-configuration-2
+
+
+oc patch namespace keycloak -p \
+'{"metadata":{"annotations":{"openshift.io/node-selector":"node-role.kubernetes.io/infra=true"}}}'
+
+oc create secret generic keycloak-db-secret \
+  --from-literal=username=keycloak \
+  --from-literal=password=5CGcmvBHkFYf7Gms
+
+oc create -f - <<EOF
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: keycloak
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql-db
+spec:
+  serviceName: postgresql-db-service
+  selector:
+    matchLabels:
+      app: postgresql-db
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: postgresql-db
+    spec:
+      containers:
+        - name: postgresql-db
+          image: postgres:latest
+          volumeMounts:
+            - mountPath: /data
+              name: postgres-volume
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-db-secret
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-db-secret
+                  key: password
+            - name: PGDATA
+              value: /data/pgdata
+            - name: POSTGRES_DB
+              value: postgresdb
+          securityContext:
+            capabilities: {}
+            privileged: false
+          ports:
+            - containerPort: 5432
+              protocol: TCP
+      volumes:
+        - name: postgres-volume
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-db
+spec:
+  selector:
+    app: postgresql-db
+  type: LoadBalancer
+  ports:
+  - port: 5432
+    targetPort: 5432
+EOF
+
+####################################################################################################################################################
+cat <<EOF > openssl.cnf
+[ req ]
+default_bits       = 4096
+distinguished_name = req_distinguished_name
+req_extensions     = req_ext
+[ req_distinguished_name ]
+countryName                = HK
+stateOrProvinceName        = Hong Kong
+localityName               = HKLocal
+organizationName           = HKOrganization
+organizationUnitName       = HKOU
+commonName                 = *.apps.sno.cheers.local
+[ req_ext ]
+subjectAltName = @alt_names
+[alt_names]
+DNS = *.apps.sno.cheers.local
+EOF
+
+openssl genrsa -out apps.sno.cheers.local.key 4096 
+
+openssl req -new -key apps.sno.cheers.local.key -out apps.sno.cheers.local.csr -subj "/CN=*.apps.sno.cheers.local" -config openssl.cnf
+
+openssl x509 -req -days 13650 -in apps.sno.cheers.local.csr -CA rootCA.pem  -CAkey rootCA.key -CAcreateserial -out apps.sno.cheers.local.crt -extensions req_ext -extfile openssl.cnf
+
+####################################################################################################################################################
+oc -n openshift-ingress-operator get secret router-ca -o go-template='{{index .data "tls.crt" | base64decode}}' > routerca.pem
+oc -n openshift-ingress-operator get secret router-ca -o go-template='{{index .data "tls.key" | base64decode}}' > routerca.key
+
+cat <<EOF > openssl.cnf
+[ req ]
+default_bits       = 4096
+distinguished_name = req_distinguished_name
+req_extensions     = req_ext
+[ req_distinguished_name ]
+countryName                = HK
+stateOrProvinceName        = Hong Kong
+localityName               = HKLocal
+organizationName           = HKOrganization
+organizationUnitName       = HKOU
+commonName                 = keycloak.apps.sno.cheers.local
+[ req_ext ]
+subjectAltName = @alt_names
+[alt_names]
+DNS = keycloak.apps.sno.cheers.local
+EOF
+
+openssl genrsa -out keycloak.apps.sno.cheers.local.key 4096 
+
+openssl req -new -key keycloak.apps.sno.cheers.local.key -out keycloak.apps.sno.cheers.local.csr -subj "/CN=*.apps.sno.cheers.local" 
+
+openssl x509 -req -days 13650 -in keycloak.apps.sno.cheers.local.csr -CA routerca.pem  -CAkey routerca.key -CAcreateserial -out keycloak.apps.sno.cheers.local.crt -extensions req_ext -extfile openssl.cnf
+
+
+# replace
+oc -n keycloak create secret tls example-tls-secret --cert keycloak.apps.sno.cheers.local.crt --key keycloak.apps.sno.cheers.local.key -oyaml --dry-run | oc apply -f -
+
+
+####################################################################################################################################################
+
+cat <<EOF > openssl.cnf
+[ req ]
+default_bits       = 4096
+distinguished_name = req_distinguished_name
+req_extensions     = req_ext
+[ req_distinguished_name ]
+countryName                = HK
+stateOrProvinceName        = Hong Kong
+localityName               = HKLocal
+organizationName           = HKOrganization
+organizationUnitName       = HKOU
+commonName                 = keycloak.apps.sno.cheers.local
+[ req_ext ]
+subjectAltName = @alt_names
+[alt_names]
+DNS = keycloak.apps.sno.cheers.local
+EOF
+
+openssl req -subj '/CN=keycloak.apps.sno.cheers.local/O=Test Keycloak./C=US' -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out certificate.pem -config openssl.cnf
+
+oc create secret tls example-tls-secret --cert certificate.pem --key key.pem
+
+# replace
+oc create secret tls example-tls-secret --cert certificate.pem --key key.pem -oyaml --dry-run | oc apply -f -
+
+
+
+
+##############################################################################################################
+
+oc create -f - <<EOF
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: Keycloak
+metadata:
+  name: example-kc
+spec:
+  instances: 1
+  db:
+    vendor: postgres
+    usernameSecret:
+      name: keycloak-db-secret
+      key: username
+    passwordSecret:
+      name: keycloak-db-secret
+      key: password
+    host: postgres-db.keycloak.svc.cluster.local
+    database: postgresdb
+  http:
+    tlsSecret: example-tls-secret
+  hostname:
+    hostname: keycloak.apps.sno.cheers.local
+  ingress:
+    className: openshift-default
+EOF
+
+
+  http:
+    httpEnabled: true
+    httpPort: 8080
+    httpsPort: 8443
+    tlsSecret: example-tls-secret
+    
+  unsupported:
+    podTemplate:
+      metadata:
+        labels:
+          my-label: "keycloak"
+      spec:
+        containers:
+          - volumeMounts:
+              - name: keytab-volume
+                mountPath: /mnt/keytab
+        volumes:
+          - name: keytab-volume
+            secret:
+              secretName: keytab-secret
+
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: Keycloak
+metadata:
+  name: example-kc
+spec:
+  ...
+  ingress:
+    className: openshift-default
+      
+
+oc get keycloaks/example-kc -o go-template='{{range .status.conditions}}CONDITION: {{.type}}{{"\n"}}  STATUS: {{.status}}{{"\n"}}  MESSAGE: {{.message}}{{"\n"}}{{end}}'
+
+
+CONDITION: Ready
+  STATUS: true
+  MESSAGE:
+CONDITION: HasErrors
+  STATUS: false
+  MESSAGE:
+CONDITION: RollingUpdate
+  STATUS: false
+  MESSAGE:
+
+
+
+oc get secret example-kc-initial-admin -o jsonpath='{.data.username}' | base64 --decode
+oc get secret example-kc-initial-admin -o jsonpath='{.data.password}' | base64 --decode
+
+##############################################################################################################
+
+## LDAP
+
+UI display name: ldap
+Connection URL: ldap://ad.cheers.local:389
+
+itssbictssopoc
+CRJdzhAm5&
+
+CN=azureuser,CN=Users,DC=ad,DC=cheers,DC=local
+
+
+user dn: CN=Users,DC=ad,DC=cheers,DC=local
+
+Readonly mode
+
+Kerberos realm: poc-emsd
+
+Server principal: HTTP/keycloak.apps.sno.cheers.local@poc-emsd
+key tab: /opt/keycloak/conf/azureuser.keytab
+
+
+
+
+
+Kerberos realm: external
+
+Server principal: HTTP/keycloak.apps.sno.cheers.local@external
+key tab: /opt/keycloak/conf/azureuser.keytab
+
+## kerberos configure
+
+setspn -S HTTP/<keycloak_URI> <aduser>
+
+setspn -S HTTP/keycloak.apps.sno.cheers.local azureuser
+
+ktpass -out azureuser.keytab -princ HTTP/keycloak.apps.sno.cheers.local@POC-EMSD -mapUser azureuser -mapOp set -pass Redh@t123 -crypto AES256-SHA1 -ptype KRB5_NT_PRINCIPAL
+
+
+ktpass -out azureuser.keytab -princ HTTP/keycloak.apps.sno.cheers.local@ad0 -mapUser azureuser -mapOp set -pass Redh@t123 -crypto AES256-SHA1 -ptype KRB5_NT_PRINCIPAL
+
+
+
+https://learn.microsoft.com/en-us/troubleshoot/windows-server/windows-security/unsupported-etype-error-accessing-trusted-domain
+
+ksetup /setenctypeattr ad0 RC4-HMAC-MD5 AES128-CTS-HMAC-SHA1-96 AES256-CTS-HMAC-SHA1-96
+
+
+##################################################################################
+
+
+oc new-app https://github.com/dacheung-rh/keycloak-openshift-demo-nodejs#rhblog
+
+
+oc expose svc/keycloak-openshift-demo-nodejs
+
+
+
+oc apply -f - <<EOF
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: keycloak
+  namespace: demo
+immutable: false
+data:
+  keycloak: |-
+    {
+      "realm": "poc-emsd",
+      "auth-server-url": "https://keycloak.apps.sno.cheers.local/",
+      "ssl-required": "yes",
+      "resource": "external-client",
+      "credentials": {
+        "secret": "oj4c31Tovhx4RZ305P3xoTy1Nfj8tPNW"
+      },
+      "confidential-port": 0
+    }
+EOF
+
+
+oc set volumes deployment/keycloak-openshift-demo-nodejs --add -t configmap --configmap-name=keycloak  --mount-path=/usr/src/app/keycloak.json
+
+
+
+https://keycloak.apps.sno.cheers.local/realms/POC-EMSD/protocol/openid-connect/logout
+
+oj4c31Tovhx4RZ305P3xoTy1Nfj8tPNW
+
+
+https://keycloak.apps.sno.cheers.local/realms/poc-emsd/protocol/openid-connect/auth?client_id=service-nodejs&state=f0697f0d-1de1-42e1-b6b5-b5df7d137b28&redirect_uri=http%3A%2F%2Fkeycloak-openshift-demo-nodejs-demo.apps.sno.cheers.local%2Fsecured%3Fauth_callback%3D1&scope=openid&response_type=code
+
+
+
+
+
+
+issue: spring PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target
+
+keytool -import -alias sno -keystore $JAVA_HOME/lib/security/cacerts -file keycloak.apps.sno.cheers.local
+
+changeit
+
+################################################################
+
+
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: keycloak-openshift-demo-nodejs
+  namespace: demo
+  labels:
+    app: keycloak-openshift-demo-nodejs
+    app.kubernetes.io/component: keycloak-openshift-demo-nodejs
+    app.kubernetes.io/instance: keycloak-openshift-demo-nodejs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      deployment: keycloak-openshift-demo-nodejs
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        deployment: keycloak-openshift-demo-nodejs
+      annotations:
+        openshift.io/generated-by: OpenShiftNewApp
+    spec:
+      volumes:
+        - name: keycloak-volume
+          secret:
+            secretName: keycloak-secret
+            defaultMode: 511
+      containers:
+        - name: keycloak-openshift-demo-nodejs
+          image: 'image-registry.openshift-image-registry.svc:5000/demo/keycloak-openshift-demo-nodejs@sha256:7667cd4c6e30c8b89a9748a3a974eb31ca76ea6487d7b42b28aa8408ea406a8e'
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          resources: {}
+          volumeMounts:
+            - name: keycloak-volume
+              mountPath: /usr/src/app/keycloak.json
+              subPath: keycloak.json
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          imagePullPolicy: IfNotPresent
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      securityContext: {}
+      schedulerName: default-scheduler
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600
+
+
+
+
+
+
+
+
+
+
+
+
+kind: Secret
+apiVersion: v1
+metadata:
+  name: keycloak-secret
+  namespace: demo
+data:
+  keycloak.json: ewogICJyZWFsbSI6ICJwb2MtZW1zZCIsCiAgImF1dGgtc2VydmVyLXVybCI6ICJodHRwczovL2tleWNsb2FrLmFwcHMuc25vLmNoZWVycy5sb2NhbC8iLAogICJzc2wtcmVxdWlyZWQiOiAiZXh0ZXJuYWwiLAogICJyZXNvdXJjZSI6ICJleHRlcm5hbC1jbGllbnQiLAogICJjcmVkZW50aWFscyI6IHsKICAgICJzZWNyZXQiOiAib2o0YzMxVG92aHg0UlozMDVQM3hvVHkxTmZqOHRQTlciCiAgfSwKICAiY29uZmlkZW50aWFsLXBvcnQiOiAwCn0=
+type: Opaque
+
+
+
+
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: app-conf
+  namespace: demo
+data:
+  application.properties: ''
+  application.yml: |
+    server:
+      port: 8081
+      servlet:
+        context-path: /
+    spring:
+      main:
+        allow-circular-references: true
+
+    keycloak:
+      client: spring-boot-keycloak
+
+    saml:
+      keystore:
+        path: classpath:/saml/keystore.jks
+        password: store123
+        alias: spring-boot-keycloak
+      url:
+        descriptor: https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml/descriptor
+
+
+
+
+
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: saml-conf
+  namespace: demo
+data:
+  descriptor.xml: |-
+    <md:EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" entityID="https://keycloak.apps.sno.cheers.local/realms/external">
+    <md:IDPSSODescriptor WantAuthnRequestsSigned="true" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <md:KeyDescriptor use="signing">
+    <ds:KeyInfo>
+    <ds:KeyName>W87geqOQJasyEdKcvQovLDVz2KOLBqdQIjckxe_zkd8</ds:KeyName>
+    <ds:X509Data>
+    <ds:X509Certificate>MIICnzCCAYcCBgGPETQWrTANBgkqhkiG9w0BAQsFADATMREwDwYDVQQDDAhleHRlcm5hbDAeFw0yNDA0MjQxNzQxMTdaFw0zNDA0MjQxNzQyNTdaMBMxETAPBgNVBAMMCGV4dGVybmFsMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA86bdBQIGTc+yCMfR5cEpPkX1973s61ndqbxrbmMpwT6SEPsRXhbwK4bgJXrC/guRThfm0j8O8chs1a6/rY3Egha0PB5FHNU51JzAnZ9o2Eo14SKRDnxCskGwA+Pkb9LSI+WpKajklKnkGNqkdyiKmnMWCRrFGTIjEPxnKBVr5xO1PEpux6oygtC4EoT+LtvDxawtFvJJsckOJeYtGeR8PSbS/BfXAmn74Xei9Ci4iVyX/zWK01aaxROYtQ/2wY8U1yp3y8eL2LNPBPOrnWtd6TAXBNpia8f8tPCKwoL5cj3C8G2S/lhPNzTE//ISsexD4hem6ca7+zjNJkR++oLtzwIDAQABMA0GCSqGSIb3DQEBCwUAA4IBAQCdWyxrbmjDeq4j4etElVyYbr06U3M+plp8JOJVOqsxt1rpdby+qN95q8Raw9Zfj6bDxD8yWFkcVeoo6KmFkfAWLvP+GVQaqgDoOA/u+DNfWfshYFFjrStwSCglMxSa9X8Sb22iDW/Pw6OjYvkuvorW0sRqGriTY6+0rIWmHHG1uYiQH1mu7nJWnPAeWRiqAfBwqo+ihF9ZZ5OGq3UYhVb40bGwJCsGiY31hozo/wVyExwu7eVBcaOLuzgv5nTS3bNbvWr5XAdqmtWWojUDHnO5DtclGL7KBmrBqHGuQYkdLFiMP4egbVj1d2xrwuesRLbVdt0Uiki3HY1tQjUuNAA+</ds:X509Certificate>
+    </ds:X509Data>
+    </ds:KeyInfo>
+    </md:KeyDescriptor>
+    <md:ArtifactResolutionService Binding="urn:oasis:names:tc:SAML:2.0:bindings:SOAP" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml/resolve" index="0"/>
+    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Artifact" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:SOAP" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+    <md:NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:persistent</md:NameIDFormat>
+    <md:NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:transient</md:NameIDFormat>
+    <md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified</md:NameIDFormat>
+    <md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</md:NameIDFormat>
+    <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+    <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+    <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:SOAP" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+    <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Artifact" Location="https://keycloak.apps.sno.cheers.local/realms/external/protocol/saml"/>
+    </md:IDPSSODescriptor>
+    </md:EntityDescriptor>
+  keystore.jks: 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
+
