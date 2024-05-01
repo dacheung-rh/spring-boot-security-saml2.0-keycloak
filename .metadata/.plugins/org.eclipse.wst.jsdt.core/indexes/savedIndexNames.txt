@@ -1,8 +1,0 @@
-INDEX VERSION 1.4+/home/davy/workspace/spring-boot-security-saml2.0-keycloak/.metadata/.plugins/org.eclipse.wst.jsdt.core/indexes
-3634340269.index
-1668870979.index
-2963851064.index
-3013816468.index
-4069907909.index
-4206886237.index
-2064281950.index

@@ -1,7 +1,0 @@
-INDEX VERSION 1.131
-/home/davy/workspace/spring-boot-security-saml2.0-keycloak/.metadata/.plugins/org.eclipse.jst.jsp.core/jspsearch/2094566243.index
-/MJpegStreamer/src/main/test
-/home/davy/workspace/spring-boot-security-saml2.0-keycloak/.metadata/.plugins/org.eclipse.jst.jsp.core/jspsearch/1628287677.index
-/MJpegStreamer/src/main/test
-/home/davy/workspace/spring-boot-security-saml2.0-keycloak/.metadata/.plugins/org.eclipse.jst.jsp.core/jspsearch/335691599.index
-/MJpegStreamer/src/main/test
