@@ -46,11 +46,6 @@ spec:
         - name: app-volume
           configMap:
             name: app-conf
-        - name: saml-volume
-          secret:
-            secretName: saml-secret
-            defaultMode: 420
-            optional: false
       containers:
         - name: ssodemo
           image: 'quay.io/dacheung1/saml2-sso-springboot-keycloak:0.0.1-SNAPSHOT'
@@ -62,8 +57,6 @@ spec:
               mountPath: /var/run/secrets/java.io/keystores
             - name: app-volume
               mountPath: /appconf
-            - name: saml-volume
-              mountPath: /appconf/saml
           ports:
             - containerPort: 8081
               protocol: TCP
