@@ -1,0 +1,8 @@
+/home/davy/workspace2/spring-boot-security-saml2.0-keycloak/src/main/java/com/demo/authentication/MvcConfig.java
+/home/davy/workspace2/spring-boot-security-saml2.0-keycloak/src/main/java/com/demo/Saml2SsoSpringbokKeycloakApplication.java
+/home/davy/workspace2/spring-boot-security-saml2.0-keycloak/src/main/java/com/demo/config/SamlSecurityConfig.java
+/home/davy/workspace2/spring-boot-security-saml2.0-keycloak/src/main/java/com/demo/stereotypes/CurrentUser.java
+/home/davy/workspace2/spring-boot-security-saml2.0-keycloak/src/main/java/com/demo/authentication/SAMLUserDetailsServiceImpl.java
+/home/davy/workspace2/spring-boot-security-saml2.0-keycloak/src/main/java/com/demo/controller/IndexController.java
+/home/davy/workspace2/spring-boot-security-saml2.0-keycloak/src/main/java/com/demo/authentication/CurrentUserHandlerMethodArgumentResolver.java
+/home/davy/workspace2/spring-boot-security-saml2.0-keycloak/src/main/java/com/demo/config/SecurityConfig.java
