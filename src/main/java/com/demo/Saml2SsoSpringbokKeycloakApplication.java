@@ -8,7 +8,7 @@ public class Saml2SsoSpringbokKeycloakApplication {
 
 	public static void main(String[] args) {
 
-		System.setProperty("javax.net.debug", "all");
+		// System.setProperty("javax.net.debug", "all");
 		SpringApplication.run(Saml2SsoSpringbokKeycloakApplication.class, args);
 	}
 

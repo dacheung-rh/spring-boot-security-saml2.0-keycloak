@@ -172,8 +172,7 @@ public class SamlSecurityConfig {
     /**
      * Access metadata by URL.
      * */
-
-   @Bean
+    @Bean
     @Qualifier("idp-keycloak")
     public ExtendedMetadataDelegate keycloakExtendedMetadataProvider()
             throws MetadataProviderException {
@@ -191,28 +190,6 @@ public class SamlSecurityConfig {
         return extendedMetadataDelegate;
     }
 
-    /**
-     * Access metadata XML FILE.
-     * */
-/*
-    @Bean
-    @Qualifier("idp-keycloak")
-    public ExtendedMetadataDelegate keycloakExtendedMetadataProvider() throws MetadataProviderException {
-
-        org.opensaml.util.resource.Resource resource = null;
-
-        try {
-            resource = new ClasspathResource("/saml/descriptor.xml");
-        } catch (ResourceException e) {
-            e.printStackTrace();
-        }
-
-        Timer timer = new Timer("saml-metadata");
-        ResourceBackedMetadataProvider provider = new ResourceBackedMetadataProvider(timer,resource);
-        provider.setParserPool(parserPool());
-        return new ExtendedMetadataDelegate(provider, extendedMetadata());
-    }
-*/
     @Bean
     @Qualifier("metadata")
     public CachingMetadataManager metadata() throws MetadataProviderException {

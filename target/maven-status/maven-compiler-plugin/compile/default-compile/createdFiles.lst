@@ -1,8 +1,0 @@
-com/demo/stereotypes/CurrentUser.class
-com/demo/Saml2SsoSpringbokKeycloakApplication.class
-com/demo/config/SamlSecurityConfig.class
-com/demo/authentication/SAMLUserDetailsServiceImpl.class
-com/demo/authentication/MvcConfig.class
-com/demo/authentication/CurrentUserHandlerMethodArgumentResolver.class
-com/demo/config/SecurityConfig.class
-com/demo/controller/IndexController.class

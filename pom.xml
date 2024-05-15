@@ -17,78 +17,74 @@
 		<java.version>17</java.version>
 	</properties>
 
-	<dependencies>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-security</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-thymeleaf</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.security.extensions</groupId>
-			<artifactId>spring-security-saml2-core</artifactId>
-			<version>1.0.10.RELEASE</version>
-		</dependency>
-	</dependencies>
-
-	<repositories>
-		<repository>
-			<id>Shibboleth</id>
-			<name>Shibboleth</name>
-			<url>https://build.shibboleth.net/nexus/content/repositories/releases/</url>
-		</repository>
-	</repositories>
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-resources-plugin</artifactId>
-				<version>3.1.0</version>
-			</plugin>
-		</plugins>
-	</build>
-
-	<profile>
-		<id>openshift</id>
-		<dependencyManagement>
+	<profiles>
+		<profile>
+			<id>openshift</id>
+			<dependencyManagement>
+				<dependencies>
+					<dependency>
+						<groupId>org.springframework.cloud</groupId>
+						<artifactId>spring-cloud-kubernetes-dependencies</artifactId>
+						<version>0.3.0.RELEASE</version>
+						<type>pom</type>
+						<scope>import</scope>
+					</dependency>
+					<dependency>
+						<groupId>org.springframework.cloud</groupId>
+						<artifactId>spring-cloud-dependencies</artifactId>
+						<version>2023.0.0</version>
+						<type>pom</type>
+						<scope>import</scope>
+					</dependency>
+				</dependencies>
+			</dependencyManagement>
+			
 			<dependencies>
 				<dependency>
-					<groupId>org.springframework.cloud</groupId>
-					<artifactId>spring-cloud-kubernetes-dependencies</artifactId>
-					<version>0.3.0.RELEASE</version>
-					<type>pom</type>
-					<scope>import</scope>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-web</artifactId>
 				</dependency>
 				<dependency>
-					<groupId>org.springframework.cloud</groupId>
-					<artifactId>spring-cloud-dependencies</artifactId>
-					<version>2023.0.0</version>
-					<type>pom</type>
-					<scope>import</scope>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-security</artifactId>
+				</dependency>
+				<dependency>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-thymeleaf</artifactId>
+				</dependency>
+				<dependency>
+					<groupId>org.springframework.security.extensions</groupId>
+					<artifactId>spring-security-saml2-core</artifactId>
+					<version>1.0.10.RELEASE</version>
 				</dependency>
 			</dependencies>
-		</dependencyManagement>
-		
-		<dependencies>
-			<dependency>
-				<groupId>org.springframework.cloud</groupId>
-				<artifactId>spring-cloud-starter-kubernetes-config</artifactId>
-			</dependency>
-			<dependency>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-starter-actuator</artifactId>
-			</dependency>
-		</dependencies>
-	</profile>
+
+			<repositories>
+				<repository>
+					<id>Shibboleth</id>
+					<name>Shibboleth</name>
+					<url>https://build.shibboleth.net/nexus/content/repositories/releases/</url>
+				</repository>
+			</repositories>
+
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-maven-plugin</artifactId>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-resources-plugin</artifactId>
+						<version>3.1.0</version>
+					</plugin>
+				</plugins>
+			</build>
+			
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+		</profile>
+	</profiles>
 
 </project>
