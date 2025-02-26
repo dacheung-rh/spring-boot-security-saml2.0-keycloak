@@ -23,11 +23,19 @@ password: **admin**
 
 # Reference: 
 https://stackoverflow.com/questions/71605941/spring-security-global-authenticationmanager-without-the-websecurityconfigurera
+
 https://www.baeldung.com/spring-deprecated-websecurityconfigureradapter
+
 https://github.com/eugenp/tutorials/tree/master/spring-security-modules/spring-security-saml
+
 https://www.baeldung.com/spring-security-saml
+
 https://blog.codecentric.de/en/2019/03/secure-spring-boot-app-saml-keycloak/
+
 https://github.com/thomasdarimont/spring-boot-security-saml-sample
+
 https://codetinkering.com/spring-security-saml2-service-provider-example/
+
 https://codetinkering.com/saml2-spring-security-5-2-tutorial/
+
 https://auth0.com/blog/how-saml-authentication-works/
